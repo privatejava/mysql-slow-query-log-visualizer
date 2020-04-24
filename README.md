@@ -2,7 +2,7 @@
 
 A slow query log visualiser for slow MySQL queries. Forked from https://code.google.com/p/mysql-slow-query-log-visualizer/
 
-It is live (no need to download yourself) thanks to githubs pages feature here: https://privatejava.github.io/mysql-slow-query-log-visualizer/app.html
+It is live (no need to download yourself) thanks to githubs pages feature here: https://privatejava.github.io/mysql-slow-query-log-visualizer
 
 It supports for AWS Insight Logs of RDS as well.
 

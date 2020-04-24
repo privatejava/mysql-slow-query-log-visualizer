@@ -36,99 +36,100 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
-function processLog (logtext)
-{
+function processLog(logtext) {
     var log_entry;
     var log_lines;
     var date_string;
     var entry_stats;
-    
-    logdata = logtext.split("# User@Host: ");
+
+
+    var logdata = logtext.split("# User@Host: ");
     logdata.shift();
 
     for (var i = 0; i < logdata.length; i++) {
-        
+
         // load string
-        
+
         log_entry = logdata[i];
         logdata[i] = {};
-        
+
         log_lines = log_entry.split("\n");
-       
+
         // get host
-        
+
         logdata[i].db_name = log_lines[0].split("[")[1].split("]")[0];
-       
+
         // get stats
-        
+
         entry_stats = log_lines[1].split(" ");
         logdata[i].query_time = entry_stats[2]; // query time
         logdata[i].lock_time = entry_stats[5]; // lock time
         logdata[i].rows_sent = entry_stats[7]; // rows sent
         logdata[i].rows_examined = entry_stats[10]; // row examined
-        
-        if (log_lines[2].substr(0,3) == "use") {
-            log_lines.shift(); 
+
+        if (log_lines[2].substr(0, 3) == "use") {
+            log_lines.shift();
         }
-        
+
         date_string = log_lines[2].split("SET timestamp=")[1].split(";")[0];
-        
+
         // parse date
-        
+
         d = new Date(date_string * 1000);
-        
+
         var year = d.getFullYear();
-        
+
         var month = (d.getUTCMonth() + 1) + "";
         if (month.length == 1) month = "0" + month;
-        
+
         var day = d.getDate().toString();
         if (day.length == 1) day = "0" + day;
-        
+
         var dayOfWeek = d.getDay();
-        
+
         var hours = d.getHours().toString();
         if (hours.length == 1) hours = "0" + hours;
-        
+
         var mins = d.getMinutes().toString();
         if (mins.length == 1) mins = "0" + mins;
-        
+
         date_string = year + "/" + month + "/" + day + " " + hours + ":" + mins;
-        
+
         logdata[i].dateObj = d; // date
         logdata[i].date = date_string;
         logdata[i].hour = hours;
-        
+
         // isolate query
-        
+
         log_lines.shift();
         log_lines.shift();
         log_lines.shift();
-        
+
         logdata[i].query_string = log_lines.join("\n").split("# Time: ")[0]; // query
-        
+
         // time stats
-        
+
         if (timedata[dayOfWeek][hours] == null) {
             timedata[dayOfWeek][hours] = 0;
         }
-        
+
         timedata[dayOfWeek][hours]++;
-        
+
     }
-    
-    return logdata.length;
+
+    logdataAll.push(logdata[0]);
+    // console.log(logdata.length);
+    // return logdata.length;
 }
 
-function createList ()
-{
+function createList() {
     var options = {
         item: 'log_list_item',
         maxVisibleItemsCount: 3000
     }
-    
-    list = new List('log_list', options, logdata);
-    
+
+    list = new List('log_list', options, logdataAll);
+
     document.getElementById('drop_zone').style.display = 'none';
     document.getElementById('log_list').style.display = 'table';
 
@@ -136,26 +137,26 @@ function createList ()
         item: 'time_list_item'
     }
     list2 = new List('time_list', options2, timedata);
-    
+
     $("#log_list_search").keyup(updateTimeChart);
 }
 
 function createChart() {
     $('table#time_list tfoot').remove();
     $('table#time_list').visualize({
-        type: 'line', 
-        width: (window.innerWidth - 200) + 'px', 
+        type: 'line',
+        width: (window.innerWidth - 200) + 'px',
         height: '400px'
     }).appendTo('#chart').trigger('visualizeRefresh');
     document.getElementById('time_list').style.display = 'none';
 }
 
-function updateTimeChart () {
-    
+function updateTimeChart() {
+
     var count = 0;
     var is = list.items;
     var dayOfWeek;
-    
+
     var hours;
     for (var d = 0; d < 7; d++) {
         for (var hour in timedata[d]) {
@@ -163,14 +164,14 @@ function updateTimeChart () {
         }
         timedata[d].dayName = dayNames[d];
     }
-    
+
     for (var i = 0, il = is.length; i < il && i < 300000; i++) {
         if (
             (list.filtered && list.searched && is[i].found && is[i].filtered) ||
             (list.filtered && !list.searched && is[i].filtered) ||
             (!list.filtered && list.searched && is[i].found) ||
             (!list.filtered && !list.searched)
-            ) {
+        ) {
             var obj = is[i].values();
             hours = obj.hour;
             dayOfWeek = obj.dateObj.getDay();
@@ -202,13 +203,26 @@ function handleFileSelect(evt) {
 
 
     var reader = new FileReader();
-    
+
     // Closure to capture the file information.
-    reader.onloadend = function(e) {
+    reader.onloadend = function (e) {
         if (e.target.readyState == FileReader.DONE) {
-            var len = processLog(e.target.result);
+            var lines = e.target.result.split("\n");
+            for (var ind in lines) {
+                var line = lines[ind];
+                if (line.indexOf("# Time") >= 0) {
+                    line = line.substr(line.indexOf("# Time"));
+                    line = line.split("#").join("\n#");
+                    var re = /(SET timestamp=[0-9]+;)/gi;
+                    line = line.replace(re, "\n$1\n\n");
+                    // console.log(line);
+                    processLog(line);
+
+                }
+
+            }
             var span = document.createElement('span');
-            span.innerHTML = "Imported " + len + " entries.";
+            span.innerHTML = "Imported " + logdataAll.length + " entries.";
             document.getElementById('load_result').insertBefore(span, null);
             createList();
             try {
@@ -216,6 +230,16 @@ function handleFileSelect(evt) {
             } catch (error) {
                 console.log(error);
             }
+            // var len = processLog(e.target.result);
+            // var span = document.createElement('span');
+            // span.innerHTML = "Imported " + len + " entries.";
+            // document.getElementById('load_result').insertBefore(span, null);
+            // createList();
+            // try {
+            //     createChart();
+            // } catch (error) {
+            //     console.log(error);
+            // }
         }
     };
 
@@ -236,7 +260,7 @@ function start() {
     dropZone.addEventListener('drop', handleFileSelect, false);
 }
 
-var logdata = [];
+var logdataAll = [];
 var timedata = [];
 var dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 for (var i = 0; i < 7; i++) {
